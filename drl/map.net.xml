@@ -117,10 +117,10 @@
     </edge>
 
     <tlLogic id="juncInterTL" type="static" programID="0" offset="0">
-        <phase duration="60" state="GGGGrrrrGGGGrrrr"/>
+        <phase duration="120" state="GGGGrrrrGGGGrrrr"/>
         <phase duration="4"  state="yyyyrrrryyyyrrrr"/>
         <phase duration="1"  state="rrrrrrrrrrrrrrrr"/>
-        <phase duration="60" state="rrrrGGGGrrrrGGGG"/>
+        <phase duration="120" state="rrrrGGGGrrrrGGGG"/>
         <phase duration="4"  state="rrrryyyyrrrryyyy"/>
         <phase duration="1"  state="rrrrrrrrrrrrrrrr"/>
     </tlLogic>

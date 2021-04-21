@@ -19,7 +19,7 @@ class DataPlotter():
         tstamps=[x[0] for x in self.maxOutArr]
         maxouts=[x[1] for x in self.maxOutArr]
         plt.plot(tstamps,maxouts)
-        fig.savefig("staticPlotMaxout.jpg")
+        fig.savefig("drlPlotMaxout.jpg")
     
     # Plots the incoming vehicle queue counts across time
     def plotQueueLength(self):
@@ -27,5 +27,5 @@ class DataPlotter():
         tstamps=[x[0] for x in self.inCounts]
         maxouts=[x[1] for x in self.inCounts]
         plt.plot(tstamps,maxouts)
-        fig.savefig("staticPlotQueueLength.jpg")
+        fig.savefig("drlPlotQueueLength.jpg")
 

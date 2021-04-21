@@ -1,6 +1,9 @@
 import traci
 from plot import DataPlotter
-
+from DQN import DQN
+import numpy as np
+from tensorflow import keras
+from flowRoute import generateFlowRoute
 
 # StepListener class that monitors the lanes for vehicles. Captures the count of incoming and outgoing vehicles,
 # and delay of incoming vehicles withing the detector distance.
@@ -104,40 +107,163 @@ class TrafficLightListener(traci.StepListener):
     def getData(self):
         return self.maxOuts
 
+        
+# count incoming vehicles
+def countVQ(edgeId):
+        vehList=traci.edge.getLastStepVehicleIDs(edgeId)
+        vcnt=0
+        for vh in vehList:
+            if edgeId[-1:]=='1' and traci.vehicle.getLanePosition(vh)>=traci.lane.getLength("{}_0".format(edgeId))-detectDist:
+                vcnt+=1
+            if edgeId[-1:]=='2' and traci.vehicle.getLanePosition(vh)<=detectDist:
+                vcnt+=1
+        return vcnt
+
+
+# reward function
+def calcReward(inCnt,outCnt,inDelay):
+    w1=-1
+    w2=-0.5
+    w3=2
+    reward=(w1*inCnt)+(w2*inDelay)+(w3*outCnt)
+    return reward
+
+# function to train the DQN model.
+def train_model():
+    episodes=5
+    dqn=DQN()
+    dynamicFlowArr=np.random.choice(range(400,4000),size=episodes)
+    modelStep=3
+    for trial,flow in zip(range(episodes),dynamicFlowArr):
+        generateFlowRoute(flow)
+        print("Training episode : {} having flow rate {}".format(trial,flow))
+        sumoCmd=["sumo", "-n", "map.net.xml","-r","trainDemands.rou.xml","--step-length","0.01","-S","-d","0.0","-Q","--no-step-log"]      
+        traci.start(sumoCmd)
+        lanelisten=LaneListener()
+        traci.addStepListener(lanelisten)
+        traci.trafficlight.setPhase("juncInterTL",0)
+        totalVC=0
+        for di in dirList:
+            eIn="edge_{}_1".format(di)
+            inCount=countVQ(eIn)
+            totalVC+=inCount
+        cur_state=np.array([totalVC]).reshape(1,1)
+        action=0
+        prevT=0.01
+        done=False
+        while traci.simulation.getTime()<=totalSimDuration:
+            traci.simulationStep()
+            
+            if(traci.simulation.getTime()-prevT>=modelStep):
+                reward=calcReward(lanelisten.getData()[0][-1][1],lanelisten.getData()[1][-1][1],lanelisten.getData()[2][-1][1])
+                totalVC=0
+                for di in dirList:
+                    eIn="edge_{}_1".format(di)
+                    inCount=countVQ(eIn)
+                    totalVC+=inCount
+                new_state=np.array([totalVC]).reshape(1,1)
+                dqn.remember(cur_state,action,reward,new_state,done)
+                dqn.replay()
+                dqn.target_train()
+
+                action=dqn.act(cur_state)
+                if action==0:
+                    modelStep=3
+                else:
+                    modelStep=15
+                    curTLphase=traci.trafficlight.getPhase("juncInterTL")
+                    if curTLphase!=0 and curTLphase!=3:
+                        action=0
+                        modelStep=3
+                    else:
+                        traci.trafficlight.setPhase("juncInterTL",(curTLphase+1))
+                cur_state=np.array([new_state]).reshape(1,1)
+                prevT=traci.simulation.getTime()
+
+        done=True
+        reward=calcReward(lanelisten.getData()[0][-1][1],lanelisten.getData()[1][-1][1],lanelisten.getData()[2][-1][1])
+        totalVC=0
+        for di in dirList:
+            eIn="edge_{}_1".format(di)
+            inCount=countVQ(eIn)
+            totalVC+=inCount
+        new_state=np.array([totalVC]).reshape(1,1)
+        dqn.remember(cur_state,action,reward,new_state,done)
+        dqn.replay()
+        dqn.target_train()
+
+        traci.close()
+
+    print("Training complete! Saving Model!")
+    dqn.save_model("trainedQModel")
+
+                
 
 
 
 if __name__ == '__main__':
-    # Change first parameter "sumo" to "sumo-gui" to open the GUI. Change the value after "-d" to "50" or "100" to slowdown the simulation in GUI.
-    sumoCmd=["sumo", "-n", "map.net.xml","-r","demands.rou.xml","--step-length","0.01","-S","-d","0.0","-Q"]      
-    traci.start(sumoCmd)
-
     # Some Simulation Parameters
-    totalSimDuration=3600
+    totalSimDuration=360
     minDur=10
     stepDuration=3
     dirList=["LR","RL","NS","SN"]
     detectDist=55
 
-    # StepListener objects which are used to execute functions at every simulation step
-    tlListener=TrafficLightListener()
-    laneListener=LaneListener()
-    traci.addStepListener(laneListener)
-    traci.addStepListener(tlListener)
-    
-    # Simulation loop
-    while traci.simulation.getTime()<=totalSimDuration:
-        traci.simulationStep()
-    traci.close()
+    wantToTrain=input("Enter (1) to train, or  (2) to test : ")
+    if wantToTrain=="1":
+        train_model()
+    else:
+        model = keras.models.load_model('trainedQModel')
+        print("Loading model...")
+        model.summary()
+        
+
+        # Change first parameter "sumo" to "sumo-gui" to open the GUI. Change the value after "-d" to "50" or "100" to slowdown the simulation in GUI.
+        sumoCmd=["sumo-gui", "-n", "map.net.xml","-r","testDemands.rou.xml","--step-length","0.01","-S","-d","50.0"]      
+        traci.start(sumoCmd)
 
 
-    # Plot the obtained simulation results
-    maxOutData=tlListener.getData()
-    laneSimData=laneListener.getData()
-    dataPlot=DataPlotter(laneSimData[0],laneSimData[1],laneSimData[2],maxOutData)
-    dataPlot.plotMaxOut()
-    dataPlot.plotQueueLength()
-    
+        # StepListener objects which are used to execute functions at every simulation step
+        tlListener=TrafficLightListener()
+        laneListener=LaneListener()
+        traci.addStepListener(laneListener)
+        traci.addStepListener(tlListener)
+        
+        # Simulation loop
+        predStep=3
+        prevT=0.1
+        traci.trafficlight.setPhase("juncInterTL",0)
+        while traci.simulation.getTime()<=totalSimDuration:
+            traci.simulationStep()
+            if traci.simulation.getTime()-prevT>=predStep:
+                totalVC=0
+                for di in dirList:
+                    eIn="edge_{}_1".format(di)
+                    inCount=countVQ(eIn)
+                    totalVC+=inCount
+                inputState=np.array([totalVC]).reshape(1,1)
+                action=np.argmax(model.predict(inputState))
+                if action==0:
+                        predStep=3
+                else:
+                    predStep=15
+                    curTLphase=traci.trafficlight.getPhase("juncInterTL")
+                    if curTLphase!=0 and curTLphase!=3:
+                        action=0
+                        predStep=3
+                    else:
+                        traci.trafficlight.setPhase("juncInterTL",(curTLphase+1))
+                prevT=traci.simulation.getTime()
+        traci.close()
+
+
+        # Plot the obtained simulation results
+        maxOutData=tlListener.getData()
+        laneSimData=laneListener.getData()
+        dataPlot=DataPlotter(laneSimData[0],laneSimData[1],laneSimData[2],maxOutData)
+        dataPlot.plotMaxOut()
+        dataPlot.plotQueueLength()
+        
 
     
 
