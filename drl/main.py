@@ -130,13 +130,14 @@ def calcReward(inCnt,outCnt,inDelay):
 
 # function to train the DQN model.
 def train_model():
-    episodes=5
+    episodes=10
     dqn=DQN()
-    dynamicFlowArr=np.random.choice(range(400,4000),size=episodes)
+    dynamicFlowArr_hi=np.random.choice(range(2500,5000),size=episodes)
+    dynamicFlowArr_lo=np.random.choice(range(200,1000),size=episodes)
     modelStep=3
-    for trial,flow in zip(range(episodes),dynamicFlowArr):
-        generateFlowRoute(flow)
-        print("Training episode : {} having flow rate {}".format(trial,flow))
+    for trial,flow_hi,flow_lo in zip(range(episodes),dynamicFlowArr_hi,dynamicFlowArr_lo):
+        generateFlowRoute(flow_hi,flow_lo)
+        print("Training episode : {} having flow rates {} {}".format(trial,flow_hi,flow_lo))
         sumoCmd=["sumo", "-n", "map.net.xml","-r","trainDemands.rou.xml","--step-length","0.01","-S","-d","0.0","-Q","--no-step-log"]      
         traci.start(sumoCmd)
         lanelisten=LaneListener()
@@ -153,7 +154,8 @@ def train_model():
         done=False
         while traci.simulation.getTime()<=totalSimDuration:
             traci.simulationStep()
-            
+            if traci.simulation.getTime()<30:
+                continue
             if(traci.simulation.getTime()-prevT>=modelStep):
                 reward=calcReward(lanelisten.getData()[0][-1][1],lanelisten.getData()[1][-1][1],lanelisten.getData()[2][-1][1])
                 totalVC=0
@@ -167,6 +169,7 @@ def train_model():
                 dqn.target_train()
 
                 action=dqn.act(cur_state)
+                print("train action : {} ".format(action))
                 if action==0:
                     modelStep=3
                 else:
@@ -195,7 +198,7 @@ def train_model():
         traci.close()
 
     print("Training complete! Saving Model!")
-    dqn.save_model("trainedQModel")
+    dqn.save_model("trainedQModel_v5")
 
                 
 
@@ -203,7 +206,7 @@ def train_model():
 
 if __name__ == '__main__':
     # Some Simulation Parameters
-    totalSimDuration=360
+    totalSimDuration=240
     minDur=10
     stepDuration=3
     dirList=["LR","RL","NS","SN"]
@@ -213,7 +216,7 @@ if __name__ == '__main__':
     if wantToTrain=="1":
         train_model()
     else:
-        model = keras.models.load_model('trainedQModel')
+        model = keras.models.load_model('trainedQModel_v5')
         print("Loading model...")
         model.summary()
         
@@ -235,6 +238,8 @@ if __name__ == '__main__':
         traci.trafficlight.setPhase("juncInterTL",0)
         while traci.simulation.getTime()<=totalSimDuration:
             traci.simulationStep()
+            if traci.simulation.getTime()<20:
+                continue
             if traci.simulation.getTime()-prevT>=predStep:
                 totalVC=0
                 for di in dirList:
@@ -244,14 +249,17 @@ if __name__ == '__main__':
                 inputState=np.array([totalVC]).reshape(1,1)
                 action=np.argmax(model.predict(inputState))
                 if action==0:
-                        predStep=3
+                    print("action 0 at {}".format(traci.simulation.getTime()))
+                    predStep=3
                 else:
                     predStep=15
                     curTLphase=traci.trafficlight.getPhase("juncInterTL")
                     if curTLphase!=0 and curTLphase!=3:
+                        print("action 0 at {}".format(traci.simulation.getTime()))
                         action=0
                         predStep=3
                     else:
+                        print("action 1 at {}".format(traci.simulation.getTime()))
                         traci.trafficlight.setPhase("juncInterTL",(curTLphase+1))
                 prevT=traci.simulation.getTime()
         traci.close()
