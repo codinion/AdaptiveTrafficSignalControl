@@ -17,29 +17,33 @@ class LaneListener(traci.StepListener):
 
     # Helper function that calculates the delay of vehicles on an edge, that is within the detector distance.
     def findDelays(self,edgeId):
-        totalDelay=0
-        vehList=traci.edge.getLastStepVehicleIDs(edgeId)
-        for vh in vehList:
-            if traci.vehicle.getLanePosition(vh)>=traci.lane.getLength("{}_0".format(edgeId))-detectDist:
-                vhSpeed=traci.vehicle.getSpeed(vh)
-                laneSpeed=traci.lane.getMaxSpeed("{}_0".format(edgeId))
-                if vhSpeed==0:
-                    vhSpeed=0.1
-                delayRatio=laneSpeed/vhSpeed
-                totalDelay+=delayRatio
-        return totalDelay
+        # totalDelay=0
+        # vehList=traci.edge.getLastStepVehicleIDs(edgeId)
+        # for vh in vehList:
+        #     if traci.vehicle.getLanePosition(vh)>=traci.lane.getLength("{}_0".format(edgeId))-detectDist:
+        #         vhSpeed=traci.vehicle.getSpeed(vh)
+        #         laneSpeed=traci.lane.getMaxSpeed("{}_0".format(edgeId))
+        #         if vhSpeed==0:
+        #             vhSpeed=0.1
+        #         delayRatio=laneSpeed/vhSpeed
+        #         totalDelay+=delayRatio
+        # return totalDelay
+        return traci.edge.getWaitingTime(edgeId)
 
     # Helper function that calculates the number of vehicles on an edge, that is within the detector distance.
     def countVehicles(self,edgeId):
-        vehList=traci.edge.getLastStepVehicleIDs(edgeId)
-        vcnt=0
-        for vh in vehList:
-            if edgeId[-1:]=='1' and traci.vehicle.getLanePosition(vh)>=traci.lane.getLength("{}_0".format(edgeId))-detectDist:
-                vcnt+=1
-            if edgeId[-1:]=='2' and traci.vehicle.getLanePosition(vh)<=detectDist:
-                vcnt+=1
-        return vcnt
-    
+        return traci.edge.getLastStepVehicleNumber(edgeId)
+        # vehList=traci.edge.getLastStepVehicleIDs(edgeId)
+        # vcnt=0
+        # for vh in vehList:
+        #     if edgeId[-1:]=='1' and traci.vehicle.getLanePosition(vh)>=traci.lane.getLength("{}_0".format(edgeId))-detectDist:
+        #         vcnt+=1
+        #     if edgeId[-1:]=='2' and traci.vehicle.getLanePosition(vh)<=detectDist:
+        #         vcnt+=1
+        # return vcnt
+    def countHaltVehicles(self,edgeId):
+        return traci.edge.getLastStepHaltingNumber(edgeId)
+
     # At every simulation step call, this function is called. 
     # Captures the Incoming Queue count, outgoing vehicle count and the delay according to the reference paper.
     def step(self,t):
@@ -52,6 +56,7 @@ class LaneListener(traci.StepListener):
                 eIn="edge_{}_1".format(di)
                 eOut="edge_{}_2".format(di)
                 inCount=self.countVehicles(eIn)
+                inCount=inCount-self.countHaltVehicles(eIn)
                 outCount=self.countVehicles(eOut)
                 inDelay=self.findDelays(eIn)
                 vhCntInStep+=inCount
@@ -110,21 +115,22 @@ class TrafficLightListener(traci.StepListener):
         
 # count incoming vehicles
 def countVQ(edgeId):
-        vehList=traci.edge.getLastStepVehicleIDs(edgeId)
-        vcnt=0
-        for vh in vehList:
-            if edgeId[-1:]=='1' and traci.vehicle.getLanePosition(vh)>=traci.lane.getLength("{}_0".format(edgeId))-detectDist:
-                vcnt+=1
-            if edgeId[-1:]=='2' and traci.vehicle.getLanePosition(vh)<=detectDist:
-                vcnt+=1
-        return vcnt
+        # vehList=traci.edge.getLastStepVehicleIDs(edgeId)
+        # vcnt=0
+        # for vh in vehList:
+        #     if edgeId[-1:]=='1' and traci.vehicle.getLanePosition(vh)>=traci.lane.getLength("{}_0".format(edgeId))-detectDist:
+        #         vcnt+=1
+        #     if edgeId[-1:]=='2' and traci.vehicle.getLanePosition(vh)<=detectDist:
+        #         vcnt+=1
+        # return vcnt
+        return traci.edge.getLastStepVehicleNumber(edgeId)
 
 
 # reward function
 def calcReward(inCnt,outCnt,inDelay):
-    w1=-1
-    w2=-0.5
-    w3=2
+    w1=1
+    w2=-0.05
+    w3=0
     reward=(w1*inCnt)+(w2*inDelay)+(w3*outCnt)
     return reward
 
@@ -132,8 +138,8 @@ def calcReward(inCnt,outCnt,inDelay):
 def train_model():
     episodes=10
     dqn=DQN()
-    dynamicFlowArr_hi=np.random.choice(range(2500,5000),size=episodes)
-    dynamicFlowArr_lo=np.random.choice(range(200,1000),size=episodes)
+    dynamicFlowArr_hi=np.random.choice(range(9500,12000),size=episodes)
+    dynamicFlowArr_lo=np.random.choice(range(200,2000),size=episodes)
     modelStep=3
     for trial,flow_hi,flow_lo in zip(range(episodes),dynamicFlowArr_hi,dynamicFlowArr_lo):
         generateFlowRoute(flow_hi,flow_lo)
@@ -148,14 +154,13 @@ def train_model():
             eIn="edge_{}_1".format(di)
             inCount=countVQ(eIn)
             totalVC+=inCount
+
         cur_state=np.array([totalVC]).reshape(1,1)
         action=0
         prevT=0.01
         done=False
         while traci.simulation.getTime()<=totalSimDuration:
             traci.simulationStep()
-            if traci.simulation.getTime()<30:
-                continue
             if(traci.simulation.getTime()-prevT>=modelStep):
                 reward=calcReward(lanelisten.getData()[0][-1][1],lanelisten.getData()[1][-1][1],lanelisten.getData()[2][-1][1])
                 totalVC=0
@@ -198,7 +203,7 @@ def train_model():
         traci.close()
 
     print("Training complete! Saving Model!")
-    dqn.save_model("trainedQModel_v5")
+    dqn.save_model("trainedQModel_v13")
 
                 
 
@@ -206,7 +211,7 @@ def train_model():
 
 if __name__ == '__main__':
     # Some Simulation Parameters
-    totalSimDuration=240
+    totalSimDuration=1000
     minDur=10
     stepDuration=3
     dirList=["LR","RL","NS","SN"]
@@ -216,13 +221,13 @@ if __name__ == '__main__':
     if wantToTrain=="1":
         train_model()
     else:
-        model = keras.models.load_model('trainedQModel_v5')
+        model = keras.models.load_model('trainedQModel_v8')
         print("Loading model...")
         model.summary()
         
 
         # Change first parameter "sumo" to "sumo-gui" to open the GUI. Change the value after "-d" to "50" or "100" to slowdown the simulation in GUI.
-        sumoCmd=["sumo-gui", "-n", "map.net.xml","-r","testDemands.rou.xml","--step-length","0.01","-S","-d","50.0"]      
+        sumoCmd=["sumo-gui", "-n", "map.net.xml","-r","testDemands.rou.xml","--step-length","0.01","-S","-d","50.0","-Q"]      
         traci.start(sumoCmd)
 
 
@@ -238,8 +243,6 @@ if __name__ == '__main__':
         traci.trafficlight.setPhase("juncInterTL",0)
         while traci.simulation.getTime()<=totalSimDuration:
             traci.simulationStep()
-            if traci.simulation.getTime()<20:
-                continue
             if traci.simulation.getTime()-prevT>=predStep:
                 totalVC=0
                 for di in dirList:

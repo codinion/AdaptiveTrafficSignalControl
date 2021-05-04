@@ -14,29 +14,34 @@ class LaneListener(traci.StepListener):
 
     # Helper function that calculates the delay of vehicles on an edge, that is within the detector distance.
     def findDelays(self,edgeId):
-        totalDelay=0
-        vehList=traci.edge.getLastStepVehicleIDs(edgeId)
-        for vh in vehList:
-            if traci.vehicle.getLanePosition(vh)>=traci.lane.getLength("{}_0".format(edgeId))-detectDist:
-                vhSpeed=traci.vehicle.getSpeed(vh)
-                laneSpeed=traci.lane.getMaxSpeed("{}_0".format(edgeId))
-                if vhSpeed==0:
-                    vhSpeed=0.1
-                delayRatio=laneSpeed/vhSpeed
-                totalDelay+=delayRatio
-        return totalDelay
+        # totalDelay=0
+        # vehList=traci.edge.getLastStepVehicleIDs(edgeId)
+        # for vh in vehList:
+        #     if traci.vehicle.getLanePosition(vh)>=traci.lane.getLength("{}_0".format(edgeId))-detectDist:
+        #         vhSpeed=traci.vehicle.getSpeed(vh)
+        #         laneSpeed=traci.lane.getMaxSpeed("{}_0".format(edgeId))
+        #         if vhSpeed==0:
+        #             vhSpeed=0.1
+        #         delayRatio=laneSpeed/vhSpeed
+        #         totalDelay+=delayRatio
+        # return totalDelay
+        return traci.edge.getWaitingTime(edgeId)
 
     # Helper function that calculates the number of vehicles on an edge, that is within the detector distance.
     def countVehicles(self,edgeId):
-        vehList=traci.edge.getLastStepVehicleIDs(edgeId)
-        vcnt=0
-        for vh in vehList:
-            if edgeId[-1:]=='1' and traci.vehicle.getLanePosition(vh)>=traci.lane.getLength("{}_0".format(edgeId))-detectDist:
-                vcnt+=1
-            if edgeId[-1:]=='2' and traci.vehicle.getLanePosition(vh)<=detectDist:
-                vcnt+=1
-        return vcnt
-    
+        return traci.edge.getLastStepVehicleNumber(edgeId)
+        # vehList=traci.edge.getLastStepVehicleIDs(edgeId)
+        # vcnt=0
+        # for vh in vehList:
+        #     if edgeId[-1:]=='1' and traci.vehicle.getLanePosition(vh)>=traci.lane.getLength("{}_0".format(edgeId))-detectDist:
+        #         vcnt+=1
+        #     if edgeId[-1:]=='2' and traci.vehicle.getLanePosition(vh)<=detectDist:
+        #         vcnt+=1
+        # return vcnt
+    def countHaltVehicles(self,edgeId):
+        return traci.edge.getLastStepHaltingNumber(edgeId)
+
+
     # At every simulation step call, this function is called. 
     # Captures the Incoming Queue count, outgoing vehicle count and the delay according to the reference paper.
     def step(self,t):
@@ -49,6 +54,7 @@ class LaneListener(traci.StepListener):
                 eIn="edge_{}_1".format(di)
                 eOut="edge_{}_2".format(di)
                 inCount=self.countVehicles(eIn)
+                inCount=inCount-self.countHaltVehicles(eIn)
                 outCount=self.countVehicles(eOut)
                 inDelay=self.findDelays(eIn)
                 vhCntInStep+=inCount
@@ -113,7 +119,7 @@ if __name__ == '__main__':
     traci.start(sumoCmd)
 
     # Some Simulation Parameters
-    totalSimDuration=3600
+    totalSimDuration=1000
     minDur=10
     stepDuration=3
     dirList=["LR","RL","NS","SN"]

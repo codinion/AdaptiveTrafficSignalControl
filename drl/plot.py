@@ -25,7 +25,7 @@ class DataPlotter():
     def plotQueueLength(self):
         fig=plt.figure(figsize=(20,20))
         tstamps=[x[0] for x in self.inCounts]
-        maxouts=[x[1] for x in self.inCounts]
-        plt.plot(tstamps,maxouts)
+        queueL=[max(0,x[1]-10) for x in self.inCounts]
+        plt.plot(tstamps,queueL)
         fig.savefig("drlPlotQueueLength.jpg")
 

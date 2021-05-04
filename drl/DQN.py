@@ -15,12 +15,12 @@ class DQN:
         # self.env     = env
         self.action_dim=2
         self.state_space_dim=1
-        self.memory  = deque(maxlen=2000)
+        self.memory  = deque(maxlen=200)
         
         self.gamma = 0.85
         self.epsilon = 1.0
-        self.epsilon_min = 0.01
-        self.epsilon_decay = 0.95
+        self.epsilon_min = 0.1
+        self.epsilon_decay = 0.98
         self.learning_rate = 0.1
         self.tau = .125
 
