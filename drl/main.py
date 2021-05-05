@@ -211,7 +211,7 @@ def train_model():
 
 if __name__ == '__main__':
     # Some Simulation Parameters
-    totalSimDuration=1000
+    totalSimDuration=3600
     minDur=10
     stepDuration=3
     dirList=["LR","RL","NS","SN"]
@@ -227,7 +227,7 @@ if __name__ == '__main__':
         
 
         # Change first parameter "sumo" to "sumo-gui" to open the GUI. Change the value after "-d" to "50" or "100" to slowdown the simulation in GUI.
-        sumoCmd=["sumo-gui", "-n", "map.net.xml","-r","testDemands.rou.xml","--step-length","0.01","-S","-d","50.0","-Q"]      
+        sumoCmd=["sumo", "-n", "map.net.xml","-r","testDemands.rou.xml","--step-length","0.01","-S","-d","50.0","-Q"]      
         traci.start(sumoCmd)
 
 

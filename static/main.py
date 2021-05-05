@@ -119,7 +119,7 @@ if __name__ == '__main__':
     traci.start(sumoCmd)
 
     # Some Simulation Parameters
-    totalSimDuration=1000
+    totalSimDuration=3600
     minDur=10
     stepDuration=3
     dirList=["LR","RL","NS","SN"]
