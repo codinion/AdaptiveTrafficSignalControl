@@ -27,5 +27,9 @@ class DataPlotter():
         tstamps=[x[0] for x in self.inCounts]
         queueL=[max(0,x[1]-10) for x in self.inCounts]
         plt.plot(tstamps,queueL)
+        plt.xlabel("Simulation Time (s)",fontsize=30)
+        plt.ylabel("Total Queue Length",fontsize=30)
+        plt.xticks(fontsize=20)
+        plt.yticks(fontsize=20)
         fig.savefig("drlPlotQueueLength.jpg")
 

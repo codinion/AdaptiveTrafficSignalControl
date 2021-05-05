@@ -27,5 +27,9 @@ class DataPlotter():
         tstamps=[x[0] for x in self.inCounts]
         maxouts=[x[1] for x in self.inCounts]
         plt.plot(tstamps,maxouts)
+        plt.xlabel("Simulation Time (s)",fontsize=30)
+        plt.ylabel("Total Queue Length",fontsize=30)
+        plt.xticks(fontsize=20)
+        plt.yticks(fontsize=20)
         fig.savefig("actuatedPlotQueueLength.jpg")
 
