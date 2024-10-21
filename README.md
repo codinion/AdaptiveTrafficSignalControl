@@ -1,8 +1,8 @@
 # AdaptiveTrafficSignalControl
 ## Adaptive Traffic Signal Control using SUMO
 
-### Done
-- Preliminary versions are ready
-- Static and actuated might not require much modification, only testing on different flow rates and generating relevant plots
-- A basic DQN model with simple state variable has been implemented. Modification needed to make it accurate. 
+### Comparative analysis of three models of Traffic Signal Control
+- Static traffic signal control with set timeout
+- Actuated traffic signal control with a traffic signal switch based on a timeout starting from the last arrival of vehicle at junction 
+- A DQN model for learning and adapting to traffic patterns at the junction to enable adaptive traffic signal control. 
 
